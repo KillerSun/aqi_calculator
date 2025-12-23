@@ -1,164 +1,191 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
+// ANSI Colors
+#define RESET "\033[0m"
+#define GREEN "\033[1;32m"
+#define YELLOW "\033[1;33m"
+#define ORANGE "\033[38;5;208m"
+#define RED "\033[1;31m"
+#define PURPLE "\033[1;35m"
+#define MAROON "\033[38;5;88m"
+#define CYAN "\033[1;36m"
+
+// AQI Categories
+const char *categories[] = {
+    "Good", "Satisfactory", "Moderate",
+    "Poor", "Very Poor", "Severe"
+};
+
+// AQI limits
+int AQI_range_low[]  = {0, 51, 101, 201, 301, 401};
+int AQI_range_high[] = {50,100,200,300,400,500};
+
+// Breakpoints (CPCB Standard)
 typedef struct {
     float Clow, Chigh;
     int Ilow, Ihigh;
 } Breakpoint;
 
-/* AQI Formula */
-int computeAQI(float C, Breakpoint bp) {
-    return (int)((bp.Ihigh - bp.Ilow) / (bp.Chigh - bp.Clow) * (C - bp.Clow) + bp.Ilow + 0.5);
+// PM2.5
+Breakpoint PM25[] = {
+    {0,30,0,50}, {31,60,51,100}, {61,90,101,200},
+    {91,120,201,300},{121,250,301,400},{251,500,401,500}
+};
+
+// PM10
+Breakpoint PM10[] = {
+    {0,50,0,50},{51,100,51,100},{101,250,101,200},
+    {251,350,201,300},{351,430,301,400},{431,500,401,500}
+};
+
+// NO2
+Breakpoint NO2[] = {
+    {0,40,0,50},{41,80,51,100},{81,180,101,200},
+    {181,280,201,300},{281,400,301,400},{401,1000,401,500}
+};
+
+// SO2
+Breakpoint SO2[] = {
+    {0,40,0,50},{41,80,51,100},{81,380,101,200},
+    {381,800,201,300},{801,1600,301,400},{1601,2000,401,500}
+};
+
+// CO (mg/m3)
+Breakpoint CO[] = {
+    {0,1,0,50},{1.1,2,51,100},{2.1,10,101,200},
+    {10.1,17,201,300},{17.1,34,301,400},{34.1,50,401,500}
+};
+
+// O3
+Breakpoint O3[] = {
+    {0,50,0,50},{51,100,51,100},{101,168,101,200},
+    {169,208,201,300},{209,748,301,400},{749,1000,401,500}
+};
+
+// Function to compute linear AQI interpolation
+int computeIndex(float conc, Breakpoint arr[])
+{
+    for(int i=0;i<6;i++){
+        if(conc >= arr[i].Clow && conc <= arr[i].Chigh){
+            return ( (arr[i].Ihigh-arr[i].Ilow)/(arr[i].Chigh-arr[i].Clow) )*(conc-arr[i].Clow)+arr[i].Ilow;
+        }
+    }
+    return -1;
 }
 
-/* ---------------- INDIAN NAQI BREAKPOINTS ---------------- */
-
-/* PM2.5 (µg/m3) */
-int AQI_PM25(float c) {
-    Breakpoint bp;
-    if (c <= 30) bp=(Breakpoint){0,30,0,50};
-    else if (c<=60) bp=(Breakpoint){31,60,51,100};
-    else if (c<=90) bp=(Breakpoint){61,90,101,200};
-    else if (c<=120) bp=(Breakpoint){91,120,201,300};
-    else if (c<=250) bp=(Breakpoint){121,250,301,400};
-    else bp=(Breakpoint){251,350,401,500};
-    return computeAQI(c,bp);
+// Get AQI Category Level
+int getLevel(int aqi){
+    if(aqi<=50) return 0;
+    else if(aqi<=100) return 1;
+    else if(aqi<=200) return 2;
+    else if(aqi<=300) return 3;
+    else if(aqi<=400) return 4;
+    return 5;
 }
 
-/* PM10 (µg/m3) */
-int AQI_PM10(float c) {
-    Breakpoint bp;
-    if (c<=50) bp=(Breakpoint){0,50,0,50};
-    else if (c<=100) bp=(Breakpoint){51,100,51,100};
-    else if (c<=250) bp=(Breakpoint){101,250,101,200};
-    else if (c<=350) bp=(Breakpoint){251,350,201,300};
-    else if (c<=430) bp=(Breakpoint){351,430,301,400};
-    else bp=(Breakpoint){431,600,401,500};
-    return computeAQI(c,bp);
+// Colored Output
+void printColored(int level,int aqi){
+    switch(level){
+        case 0: printf(GREEN); break;
+        case 1: printf(YELLOW); break;
+        case 2: printf(ORANGE); break;
+        case 3: printf(RED); break;
+        case 4: printf(PURPLE); break;
+        default: printf(MAROON);
+    }
+    printf("\nAQI: %d | Category: %s\n\n",aqi,categories[level]);
+    printf(RESET);
 }
 
-/* NO2 (µg/m3) */
-int AQI_NO2(float c) {
-    Breakpoint bp;
-    if (c<=40) bp=(Breakpoint){0,40,0,50};
-    else if (c<=80) bp=(Breakpoint){41,80,51,100};
-    else if (c<=180) bp=(Breakpoint){81,180,101,200};
-    else if (c<=280) bp=(Breakpoint){181,280,201,300};
-    else if (c<=400) bp=(Breakpoint){281,400,301,400};
-    else bp=(Breakpoint){401,1000,401,500};
-    return computeAQI(c,bp);
-}
-
-/* SO2 (µg/m3) */
-int AQI_SO2(float c) {
-    Breakpoint bp;
-    if (c<=40) bp=(Breakpoint){0,40,0,50};
-    else if (c<=80) bp=(Breakpoint){41,80,51,100};
-    else if (c<=380) bp=(Breakpoint){81,380,101,200};
-    else if (c<=800) bp=(Breakpoint){381,800,201,300};
-    else if (c<=1600) bp=(Breakpoint){801,1600,301,400};
-    else bp=(Breakpoint){1601,2000,401,500};
-    return computeAQI(c,bp);
-}
-
-/* CO (mg/m3) */
-int AQI_CO(float c) {
-    Breakpoint bp;
-    if (c<=1.0) bp=(Breakpoint){0,1,0,50};
-    else if (c<=2.0) bp=(Breakpoint){1.1,2.0,51,100};
-    else if (c<=10) bp=(Breakpoint){2.1,10,101,200};
-    else if (c<=17) bp=(Breakpoint){10.1,17,201,300};
-    else if (c<=34) bp=(Breakpoint){17.1,34,301,400};
-    else bp=(Breakpoint){34.1,50,401,500};
-    return computeAQI(c,bp);
-}
-
-/* O3 (µg/m3) */
-int AQI_O3(float c) {
-    Breakpoint bp;
-    if (c<=50) bp=(Breakpoint){0,50,0,50};
-    else if (c<=100) bp=(Breakpoint){51,100,51,100};
-    else if (c<=168) bp=(Breakpoint){101,168,101,200};
-    else if (c<=208) bp=(Breakpoint){169,208,201,300};
-    else if (c<=748) bp=(Breakpoint){209,748,301,400};
-    else bp=(Breakpoint){749,1000,401,500};
-    return computeAQI(c,bp);
-}
-
-/* AQI Category Name */
-const char* getCategory(int aqi) {
-    if (aqi <= 50) return "Good";
-    if (aqi <= 100) return "Satisfactory";
-    if (aqi <= 200) return "Moderate";
-    if (aqi <= 300) return "Poor";
-    if (aqi <= 400) return "Very Poor";
-    return "Severe";
-}
-
-int main() {
+void calculateAQI()
+{
     float pm25, pm10, no2, so2, co, o3;
+    char city[50];
+    FILE *fp;
+    time_t t;
 
-    printf("\nEnter pollutant concentrations:\n");
-    printf("PM2.5 (µg/m³): "); scanf("%f", &pm25);
-    printf("PM10 (µg/m³): ");  scanf("%f", &pm10);
-    printf("NO2 (µg/m³): ");   scanf("%f", &no2);
-    printf("SO2 (µg/m³): ");   scanf("%f", &so2);
-    printf("CO (mg/m³): ");    scanf("%f", &co);
-    printf("O3 (µg/m³): ");    scanf("%f", &o3);
+    printf("\nEnter City Name: ");
+    scanf("%s", city);
 
-    int aqi_pm25 = AQI_PM25(pm25);
-    int aqi_pm10 = AQI_PM10(pm10);
-    int aqi_no2  = AQI_NO2(no2);
-    int aqi_so2  = AQI_SO2(so2);
-    int aqi_co   = AQI_CO(co);
-    int aqi_o3   = AQI_O3(o3);
+    printf("\nEnter PM2.5 (µg/m3): "); scanf("%f",&pm25);
+    printf("Enter PM10 (µg/m3): "); scanf("%f",&pm10);
+    printf("Enter NO2 (µg/m3): "); scanf("%f",&no2);
+    printf("Enter SO2 (µg/m3): "); scanf("%f",&so2);
+    printf("Enter CO (mg/m3): "); scanf("%f",&co);
+    printf("Enter O3 (µg/m3): "); scanf("%f",&o3);
 
-    int finalAQI =
-        (aqi_pm25 > aqi_pm10 ? aqi_pm25 : aqi_pm10);
-    finalAQI =
-        (finalAQI > aqi_no2 ? finalAQI : aqi_no2);
-    finalAQI =
-        (finalAQI > aqi_so2 ? finalAQI : aqi_so2);
-    finalAQI =
-        (finalAQI > aqi_co ? finalAQI : aqi_co);
-    finalAQI =
-        (finalAQI > aqi_o3 ? finalAQI : aqi_o3);
-
-    printf("\n-------------------------");
-    printf("\n   AQI REPORT (INDIA)");
-    printf("\n-------------------------");
-    printf("\nPM2.5 AQI: %d", aqi_pm25);
-    printf("\nPM10  AQI: %d", aqi_pm10);
-    printf("\nNO2   AQI: %d", aqi_no2);
-    printf("\nSO2   AQI: %d", aqi_so2);
-    printf("\nCO    AQI: %d", aqi_co);
-    printf("\nO3    AQI: %d", aqi_o3);
-
-    printf("\n\nFinal AQI = %d", finalAQI);
-    printf("\nCategory : %s\n", getCategory(finalAQI));
-
-    /* Save to file */
-    FILE *fp = fopen("AQI_Report.txt", "w");
-    if (fp) {
-        fprintf(fp,
-            "AQI REPORT (Indian National AQI)\n"
-            "----------------------------------\n"
-            "PM2.5 AQI : %d\n"
-            "PM10  AQI : %d\n"
-            "NO2   AQI : %d\n"
-            "SO2   AQI : %d\n"
-            "CO    AQI : %d\n"
-            "O3    AQI : %d\n"
-            "\nFinal AQI : %d\n"
-            "Category  : %s\n",
-            aqi_pm25, aqi_pm10, aqi_no2, aqi_so2, aqi_co, aqi_o3,
-            finalAQI, getCategory(finalAQI)
-        );
-        fclose(fp);
-        printf("\nReport saved to AQI_Report.txt\n");
-    } else {
-        printf("\nError: Could not save report!\n");
+    if(pm25<0||pm10<0||no2<0||so2<0||co<0||o3<0){
+        printf(RED "\nInvalid input! Concentrations cannot be negative.\n" RESET);
+        return;
     }
 
-    return 0;
+    int s1=computeIndex(pm25,PM25);
+    int s2=computeIndex(pm10,PM10);
+    int s3=computeIndex(no2,NO2);
+    int s4=computeIndex(so2,SO2);
+    int s5=computeIndex(co,CO);
+    int s6=computeIndex(o3,O3);
+
+    int aqi=s1;
+    int arr[]={s1,s2,s3,s4,s5,s6};
+    for(int i=0;i<6;i++)
+        if(arr[i]>aqi) aqi=arr[i];
+
+    int level=getLevel(aqi);
+    printColored(level,aqi);
+
+    fp=fopen("AQI_Data.csv","a");
+    if(fp==NULL){
+        printf(RED "Error opening file!\n" RESET);
+        return;
+    }
+
+    time(&t);
+    fprintf(fp,"%s,%d,%s,%s",city,aqi,categories[level],ctime(&t));
+    fclose(fp);
+    printf(GREEN "Saved to AQI_Data.csv\n" RESET);
+}
+
+void viewRecords()
+{
+    FILE *fp=fopen("AQI_Data.csv","r");
+    if(fp==NULL){
+        printf(RED "\nNo Records Found!\n" RESET);
+        return;
+    }
+
+    char ch;
+    printf(CYAN "\n===== AQI RECORDS =====\n\n" RESET);
+    while((ch=fgetc(fp))!=EOF)
+        putchar(ch);
+
+    fclose(fp);
+}
+
+int main()
+{
+    int ch;
+
+    while(1){
+        system("clear || cls");
+        printf(CYAN "============== AIR QUALITY INDEX SYSTEM (India CPCB) ==============\n" RESET);
+        printf("1. Calculate AQI\n");
+        printf("2. View Saved Records\n");
+        printf("3. Exit\n");
+        printf("Choose: ");
+        scanf("%d",&ch);
+
+        switch(ch){
+            case 1: calculateAQI(); break;
+            case 2: viewRecords(); break;
+            case 3: printf(GREEN "\nThank you for using AQI System!\n" RESET); exit(0);
+            default: printf(RED "\nInvalid Choice!\n" RESET);
+        }
+
+        printf("\nPress Enter to continue...");
+        getchar();
+        getchar();
+    }
 }
