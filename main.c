@@ -18,6 +18,16 @@ const char *categories[] = {
     "Poor", "Very Poor", "Severe"
 };
 
+// Health Tips (CPCB-style)
+const char *healthTips[] = {
+    "Air quality is good. Ideal for outdoor activities.",
+    "Minor breathing discomfort to sensitive people.",
+    "Avoid prolonged outdoor exertion.",
+    "People with heart/lung disease should limit outdoor activity.",
+    "Elderly and children should avoid outdoor exposure.",
+    "Serious health risk. Stay indoors and wear masks."
+};
+
 // AQI limits
 int AQI_range_low[]  = {0, 51, 101, 201, 301, 401};
 int AQI_range_high[] = {50,100,200,300,400,500};
@@ -95,7 +105,8 @@ void printColored(int level,int aqi){
         case 4: printf(PURPLE); break;
         default: printf(MAROON);
     }
-    printf("\nAQI: %d | Category: %s\n\n",aqi,categories[level]);
+    printf("\nAQI: %d | Category: %s\n",aqi,categories[level]);
+    printf("Health Advisory: %s\n\n", healthTips[level]);
     printf(RESET);
 }
 
@@ -143,7 +154,13 @@ void calculateAQI()
     }
 
     time(&t);
-    fprintf(fp,"%s,%d,%s,%s",city,aqi,categories[level],ctime(&t));
+    fprintf(fp,"%s,%d,%s,%s,%s",
+            city,
+            aqi,
+            categories[level],
+            healthTips[level],
+            ctime(&t));
+
     fclose(fp);
     printf(GREEN "Saved to AQI_Data.csv\n" RESET);
 }
